@@ -1,7 +1,7 @@
 #Preprocessing
 library(tidyverse)
 
-#Einlesen Rohdaten
+#Einlesen Rohdaten (Kleinerer Zeitraum für Blogpost)
 submissions <- read.csv2("data/submissions.csv", 
                          sep = ",", colClasses=c(NA), header = FALSE)
 
@@ -90,9 +90,10 @@ write.csv2(submissions_ref, "data/submissions_ref.csv", row.names = FALSE, sep =
 write.csv2(comments_crime, "data/comments_crime.csv", row.names = FALSE)
 write.csv2(comments_ref, "data/comments_ref.csv", row.names = FALSE)
 
-#descriptive analysis
+#descriptive analysis / exploration
 library(tidyverse)
 library(quanteda)
+library(lubridate)
 
 comments_crime <- read.csv2("Data/comments_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 comments_ref <- read.csv2("Data/comments_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
@@ -130,6 +131,57 @@ submissions_crime |>
   select(id, score, title) |> 
   head(10) |> 
   print()
+
+#Nur OC Beiträge. Von Nutzern formuliert.(Für den Blogpost nur noch Selftext)
+selftext_crime <- submissions_crime |> 
+  filter(!str_detect(body, "^http"))
+
+#Beide Dataframes mergen
+
+selected_crime_submissions <- submissions_crime |> 
+  select(id, body)
+
+merged_crime <- merge(selected_crime_submissions, comments_crime, by.x = "id", by.y = "id")
+
+merged_crime <- merged_crime |> 
+  rename(content = body.x, body = body.y)
+
+#Start- und Enddatum
+
+min(merged_crime$date)
+max(merged_crime$date)
+
+min(selftext_crime$date)
+max(selftext_crime$date)
+
+
+#Kommentaraufkommen nach Zeit
+
+merged_crime <- merged_crime |> 
+  mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+merged_crime |> 
+  group_by(date) |> 
+  summarise(count = n())
+
+comments_per_day <- merged_crime |> 
+  mutate(month = floor_date(date, unit = "month")) |> 
+  group_by(month) |> 
+  summarise(id = n())
+
+ggplot(comments_per_day, aes(x = month, y = id)) +
+  geom_line(color = "blue") +
+  geom_point(size = 3, color = "red") +
+  labs(
+    title = "Comment Distribution Over Time",
+    x = "Date",
+    y = "Number of Comments"
+  ) +
+  theme_minimal()
+
+# Worthäufigkeiten
+
+
 
 
 
