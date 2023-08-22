@@ -70,8 +70,23 @@ comments_ref <- comments_ref |>
   filter(body != "") |> 
   mutate(body = tolower(body))
 
-write.csv2(submissions_crime, "data/submissions_crime.csv", row.names = FALSE)
-write.csv2(submissions_ref, "data/submissions_ref.csv", row.names = FALSE)
+comments_crime |> 
+  group_by(body) |> 
+  summarise(count = n()) |> 
+  arrange(desc(count))
+
+#Filter comments ohne submission und vice versa
+
+comments_crime$id <- comments_crime$id |> 
+  str_replace_all("t3_", "")
+
+comments_ref$id <- comments_ref$id |> 
+  str_replace_all("t3_", "")
+
+#Schreibe gesäuberte Datensätze
+
+write.csv2(submissions_crime, "data/submissions_crime.csv", row.names = FALSE, sep = ",")
+write.csv2(submissions_ref, "data/submissions_ref.csv", row.names = FALSE, sep = ",")
 write.csv2(comments_crime, "data/comments_crime.csv", row.names = FALSE)
 write.csv2(comments_ref, "data/comments_ref.csv", row.names = FALSE)
 
@@ -79,24 +94,42 @@ write.csv2(comments_ref, "data/comments_ref.csv", row.names = FALSE)
 library(tidyverse)
 library(quanteda)
 
+comments_crime <- read.csv2("Data/comments_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+comments_ref <- read.csv2("Data/comments_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
-comments_crime <- read.csv2("/Users/Rico/Documents/Script/R/Projekte/Datenanalyse_Social_Media_Projekt/Data/comments_crime.csv", 
-                            colClasses=c(NA), header = FALSE, stringsAsFactors = FALSE, sep = ",")
-comments_ref <- read.csv2("/Users/Rico/Documents/Script/R/Projekte/Datenanalyse_Social_Media_Projekt/Data/comments_ref.csv", 
-                          colClasses=c(NA), header = FALSE, stringsAsFactors = FALSE, sep = ",")
-
-submissions_crime <- read.csv2("/Users/Rico/Documents/Script/R/Projekte/Datenanalyse_Social_Media_Projekt/Data/submissions_crime.csv", 
-                               colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
-submissions_ref <- read.csv2("/Users/Rico/Documents/Script/R/Projekte/Datenanalyse_Social_Media_Projekt/Data/submissions_ref.csv", 
-                             colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+submissions_crime <- read.csv2("Data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+submissions_ref <- read.csv2("Data/submissions_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
 #Posthäufigkeit von Nutzern zählen
-userfreq_c <- comments_crime |> 
-  group_by(V3) |> 
+comments_crime |> 
+  group_by(user) |> 
   summarize(count = n()) |> 
   arrange(desc(count))
 
-userfreq_s <- submissions_crime |> 
-  group_by(V4) |> 
+submissions_crime |> 
+  group_by(user) |> 
   summarize(count = n()) |> 
   arrange(desc(count))
+
+#Populärste Beiträge nach Kommentarhäufigkeit
+
+comments_crime <- comments_crime |> 
+  left_join(submissions_crime |> select(id, title), by = "id")
+
+comments_crime |> 
+  group_by(title) |> 
+  summarize(count = n()) |> 
+  mutate(percentage=paste0(round(count/sum(count)*100,2),"%")) |> 
+  arrange(desc(count)) |> 
+  print()
+
+#Populärste Beiträge nach Score
+
+submissions_crime |> 
+  arrange(desc(score)) |> 
+  select(id, score, title) |> 
+  head(10) |> 
+  print()
+
+
+
