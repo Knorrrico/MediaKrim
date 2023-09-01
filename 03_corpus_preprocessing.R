@@ -32,10 +32,21 @@ merged_ref <- merged_ref %>%
 
 corpus_crime <- corpus(merged_crime, text_field = "body")
 corpus_crime <- corpus_group(corpus_crime, groups = id)
+tokens_crime <- tokens(corpus_crime,
+                       remove_punct = TRUE,
+                       remove_symbols = TRUE,
+                       remove_numbers = TRUE,
+                       remove_url = TRUE,
+                       remove_separators = TRUE)
+tokens_crime <- tokens_remove(tokens_crime, pattern = stopwords("de"))
+dfm_crime <- dfm(tokens_crime)
+cooccurence <- fcm(dfm_crime)
+topfeat <- topfeatures(cooccurence)
+print(topfeat)
+
 
 df_combined <- rbind(merged_crime, merged_ref)
 corpus_combined <- corpus(df_combined, text_field = "body")
-
 tokens_combined <- tokens(corpus_combined,
                           remove_punct = TRUE,
                           remove_symbols = TRUE,
@@ -48,6 +59,7 @@ tokens_combined <- tokens_remove(tokens_combined, pattern = stopwords("de"))
 tokens_combined <- tokens_group(tokens_combined, groups = flair)
 
 dfm_combined <- dfm(tokens_combined)
+dfm_crime <- dfm(corpus_crime)
 
 
 
