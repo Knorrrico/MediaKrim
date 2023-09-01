@@ -30,52 +30,68 @@ comments_crime <- read.csv2("data_raw/comments_crime.csv",
 comments_ref <- read.csv2("data_raw/comments_ref.csv", 
                           sep = ",", colClasses=c(NA), header = FALSE)
 
-#Umbenennen der Variablen
+
+#Entfernen von NA, Umbenennen der Variablen
+
+#Funktion zum umbennen der Spalten
+rename_submissions <- function(df) {
+  df <- df |> 
+    rename(
+      score = V1, 
+      date = V2, 
+      title = V3, 
+      user = V4, 
+      link = V5, 
+      flair = V6, 
+      id = V7, 
+      body = V8
+    )
+  return(df)
+}
+
+rename_comments <- function(df) {
+  df <- df |> 
+    rename(
+      score = V1, 
+      date = V2, 
+      user = V3, 
+      link = V4, 
+      id = V5, 
+      body = V6
+    )
+  return(df)
+}
+
+# Gelöschte und Entfernte Inhalte filtern
+clean_and_tolower <- function(df) {
+  df <- df |> 
+    filter(!(body %in% c("[deleted]", "[removed]", ""))) |> 
+    mutate(body = tolower(body)
+    )
+  
+  if ("title" %in% names(df)) {
+    df <- df |> 
+      mutate(title = tolower(title))
+  }
+  
+  return(df)
+}
+
+#Vorher
 names(comments_crime)
 
-comments_crime <- comments_crime |> 
-  rename(score = V1, date = V2, user = V3, link = V4, id = V5, body = V6)
-comments_ref <- comments_ref |> 
-  rename(score = V1, date = V2, user = V3, link = V4, id = V5, body = V6)
-
-submissions_ref <- submissions_ref |> 
-  rename(score = V1, date = V2, title = V3, user = V4, link = V5, flair = V6, id = V7, body = V8)
-submissions_crime <- submissions_crime |> 
-  rename(score = V1, date = V2, title = V3, user = V4, link = V5, flair = V6, id = V7, body = V8)
-
-names(comments_crime)
-
-#Entfernen von NA
 comments_crime |> 
-  group_by(body) |> 
+  group_by(V6) |> 
   summarise(count = n()) |> 
   arrange(desc(count))
 
-submissions_crime <- submissions_crime |> 
-  filter(body != "[deleted]") |> 
-  filter(body != "[removed]") |> 
-  filter(body != "") |> 
-  mutate(title = tolower(title)) |> 
-  mutate(body = tolower(body))
+submissions_crime <- clean_and_tolower(rename_submissions(submissions_crime))
+submissions_ref <- clean_and_tolower(rename_submissions(submissions_ref))
+comments_crime <- clean_and_tolower(rename_comments(comments_crime))
+comments_ref <- clean_and_tolower(rename_comments(comments_ref))
 
-submissions_ref <- submissions_ref |>
-  filter(body != "[deleted]") |> 
-  filter(body != "[removed]") |> 
-  filter(body != "") |> 
-  mutate(title = tolower(title)) |> 
-  mutate(body = tolower(body))
-
-comments_crime <- comments_crime |> 
-  filter(body != "[deleted]") |> 
-  filter(body != "[removed]") |> 
-  filter(body != "") |> 
-  mutate(body = tolower(body))
-
-comments_ref <- comments_ref |> 
-  filter(body != "[deleted]") |> 
-  filter(body != "[removed]") |> 
-  filter(body != "") |> 
-  mutate(body = tolower(body))
+#Nachher
+names(comments_crime)
 
 comments_crime |> 
   group_by(body) |> 
