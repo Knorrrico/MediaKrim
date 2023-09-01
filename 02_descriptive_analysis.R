@@ -8,7 +8,10 @@ comments_ref <- read.csv2("data/comments_ref.csv", colClasses=c(NA), header = TR
 submissions_crime <- read.csv2("data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 submissions_ref <- read.csv2("data/submissions_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
-#
+#Häufigkeit Kommentare und Beiträge
+nrow(comments_crime)
+nrow(submissions_ref)
+
 #Posthäufigkeit von Nutzern zählen
 comments_crime |> 
   group_by(user) |> 
@@ -46,7 +49,6 @@ submissions_crime |>
   select(id, score, title) |> 
   head(10) |> 
   print()
-
 
 #Beide Dataframes mergen
 selected_crime_submissions <- submissions_crime |> 

@@ -62,7 +62,7 @@ rename_comments <- function(df) {
   return(df)
 }
 
-# Gelöschte und Entfernte Inhalte filtern
+#Gelöschte und Entfernte Inhalte filtern
 clean_and_tolower <- function(df) {
   df <- df |> 
     filter(!(body %in% c("[deleted]", "[removed]", ""))) |> 
