@@ -8,104 +8,153 @@ comments_ref <- read.csv2("data/comments_ref.csv", colClasses=c(NA), header = TR
 submissions_crime <- read.csv2("data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 submissions_ref <- read.csv2("data/submissions_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
+merged_crime <- read.csv2("data/merged_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+merged_ref <- read.csv2("data/merged_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+
 #Häufigkeit Kommentare und Beiträge
 nrow(comments_crime)
-nrow(submissions_ref)
+nrow(submissions_crime)
+
+#Start- und Enddatum
+range(merged_crime$date)
+
+#Count selftext
+nrow(selftext_crime)
+
+#All User in Data
+read_users <- function(file_path) {
+  con <- file(file_path, "r")
+  user_data <- readLines(con)
+  close(con)
+  return(data.frame(user = user_data))
+}
+
+user_sub_df <- read_users("data_raw/submissions_user.txt")
+user_com_df <- read_users("data_raw/comments_user.txt")
+
+# User in Crime Content
+unique_users_crime <- merged_crime |>  
+  summarise(n_unique_users = n_distinct(user))
 
 #Posthäufigkeit von Nutzern zählen
-comments_crime |> 
-  group_by(user) |> 
-  summarize(count = n()) |> 
-  arrange(desc(count))
+user_post_frequency <- function(data_frame) {
+  require(dplyr)
+  
+  result <- data_frame %>%
+    group_by(user) %>%
+    summarize(count = n()) %>%
+    arrange(desc(count))
+  
+  return(result)
+}
 
-submissions_crime |> 
-  group_by(user) |> 
-  summarize(count = n()) |> 
-  arrange(desc(count))
+remove_first_row <- function(df) {
+  df[-1, ]
+}
 
-#Populärste Beiträge nach Kommentarhäufigkeit (NAs sind beiträge die vorher gefilter wurden)
-comments_crime <- comments_crime |> 
-  left_join(submissions_crime |> select(id, title), by = "id")
+comments_portion <- user_post_frequency(comments_crime)
+submissions_portion <- user_post_frequency(submissions_crime)
+comments_total <- user_post_frequency(user_com_df)
+submissions_total <- user_post_frequency(user_sub_df)
 
-comments_ref <- comments_ref|> 
-  left_join(submissions_ref |> select(id, title), by = "id")
+comments_portion <- remove_first_row(comments_portion)
+submissions_portion <- remove_first_row(submissions_portion)
+comments_total <- remove_first_row(comments_total)
+submissions_total <- remove_first_row(submissions_total)
 
-comments_crime |> 
+comments_portion$user <- gsub("^u/", "", comments_portion$user)
+submissions_portion$user <- gsub("^u/", "", submissions_portion$user)
+
+# Plotting User Activity
+# Plot Submissions by user over whole data frame
+
+# Power User Percentage
+common_users <- intersect(submissions_total$user, submissions_portion$user)
+
+# Find the top 20 (or fewer) users by posting frequency in total_df
+top_users <- submissions_total %>% 
+  filter(user %in% common_users) %>% 
+  arrange(desc(count)) %>% 
+  head(20) %>% 
+  pull(user)
+
+# Filter both data frames to only include these top 20 users
+submissions_total_filtered <- submissions_total %>% filter(user %in% top_users)
+submissions_portion_filtered <- submissions_portion %>% filter(user %in% top_users)
+
+# Combine the data
+combined_df <- bind_rows(
+  mutate(submissions_total_filtered, type = "Total"),
+  mutate(submissions_portion_filtered, type = "Portion")
+)
+
+#Plot
+ggplot(combined_df, aes(x = reorder(user, -count), y = count, fill = type)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.6) +
+  labs(title = "Top 20 User Posting Frequency", x = "User", y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Populärste Beiträge nach Kommentarhäufigkeit
+merged_crime |> 
   group_by(title) |> 
   summarize(count = n()) |> 
   mutate(percentage=paste0(round(count/sum(count)*100,2),"%")) |> 
   arrange(desc(count)) |> 
   print()
 
-comments_crime <- comments_crime |> 
-  filter(!is.na(title))
-
-comments_ref <- comments_ref |> 
-  filter(!is.na(title))
-
-#Populärste Beiträge nach Score (datensatz mehrmals aktualisiert)
+#Populärste Beiträge nach Score
 submissions_crime |> 
   arrange(desc(score)) |> 
   select(id, score, title) |> 
   head(10) |> 
   print()
 
-#Beide Dataframes mergen
-selected_crime_submissions <- submissions_crime |> 
-  select(id, body, flair)
+#Comment frequency by time
 
-merged_crime <- merge(selected_crime_submissions, comments_crime, by.x = "id", by.y = "id")
+plot_comments_over_time <- function(merged_df) {
+  
+  # Convert date to Date format
+  merged_df <- merged_df %>% 
+    mutate(date = as.Date(date, format = "%Y-%m-%d"))
+  
+  # Count comments per day
+  comments_per_day <- merged_df %>% 
+    group_by(date) %>% 
+    summarise(count = n())
+  
+  # Count comments per week
+  comments_per_week <- merged_df %>% 
+    mutate(week = floor_date(date, unit = "week")) %>% 
+    group_by(week) %>% 
+    summarise(id = n())
+  
+  # Generate the plot
+  p <- ggplot(comments_per_week, aes(x = week, y = id)) +
+    geom_col() +
+    geom_smooth() +
+    labs(
+      title = "Comment Distribution Over Time",
+      x = "Date",
+      y = "Number of Comments"
+    ) +
+    theme_light() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+  
+  return(list(plot = p, comments_per_week = comments_per_week))
+}
 
-merged_crime <- merged_crime |> 
-  rename(content = body.x, body = body.y)
+plot_comments_over_time(merged_crime)
+comments_over_time <- plot_comments_over_time(merged_crime)
 
-#Reference
-selected_ref_submissions <- submissions_ref |> 
-  select(id, body, flair)
-
-merged_ref <- merge(selected_ref_submissions, comments_ref, by.x = "id", by.y = "id")
-
-merged_ref <- merged_ref |> 
-  rename(content = body.x, body = body.y)
-
-#Start- und Enddatum
-min(merged_crime$date)
-max(merged_crime$date)
-
-min(selftext_crime$date)
-max(selftext_crime$date)
-
-#Kommentaraufkommen nach Zeit
-merged_crime <- merged_crime |> 
-  mutate(date = as.Date(date, format = "%Y-%m-%d"))
-
-merged_crime |> 
-  group_by(date) |> 
-  summarise(count = n())
-
-comments_per_week <- merged_crime |> 
-  mutate(week = floor_date(date, unit = "week")) |> 
-  group_by(week) |> 
-  summarise(id = n())
-
-ggplot(comments_per_week, aes(x = week, y = id)) +
-  geom_col() +
-  geom_smooth() +
-  labs(
-    title = "Comment Distribution Over Time",
-    x = "Date",
-    y = "Number of Comments"
-  ) +
-  theme_light() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_x_date(date_breaks = "1 year", date_labels = "%Y")
+#Heatmap of submissions
 
 # Wochen mit stärksten Ausprägungen
-comments_per_week <- comments_per_week|> 
+comments_per_week <- comments_over_time$comments_per_week|> 
   arrange(desc(id))
 
-start_date <- as.Date("2020-06-14")
-end_date <- as.Date("2020-06-28")
+start_date <- comments_per_week$week[1]
+end_date <- start_date + weeks(1)
 
 most_comments_week <- comments_crime |> 
   filter(date >= start_date & date <= end_date)
@@ -117,14 +166,50 @@ summary_week <- most_comments_week |>
 
 top_3 <- as.list(head(summary_week$id, 3))
 
-summary_week
-# Title der populärsten Beiträge
-
 submissions_crime |> 
   filter(id %in% top_3) |> 
   select(title)
 
-#Speicher zusammengefassten Datensatz aus Submission und Comment
-write.csv2(merged_crime, "data/merged_crime.csv", row.names = FALSE)
-write.csv2(merged_ref, "data/merged_ref.csv", row.names = FALSE)
+# Aggregierte Nachrichtenseiten
+domain_from_body <- function(df) {
+  # Filter rows where the body column starts with "http"
+  df_filtered <- df |> 
+    filter(str_detect(body, "^http"))
+  
+  # Remove "http://" or "https://" and "www." from the body
+  df_filtered$body <- gsub("^https?://(www\\.)?", "", df_filtered$body)
+  
+  # Remove everything after the domain in the body
+  df_filtered$body <- gsub("/.*$", "", df_filtered$body)
+  
+  return(df_filtered)
+}
+
+submissions_crime <- domain_from_body(submissions_crime)
+
+aggregate_and_plot_top_domains <- function(df, column_name, top_n = 20) {
+  # Aggregate by domains
+  aggregated_data <- df %>% 
+    group_by(!!sym(column_name)) %>%
+    summarise(count = n()) %>% 
+    arrange(desc(count))
+  
+  # Limit to top N domains
+  top_domains <- head(aggregated_data, top_n)
+  
+  # Print the top N aggregated data
+  print(top_domains)
+  
+  # Plot the data
+  ggplot(top_domains, aes(x = reorder(!!sym(column_name), -count), y = count)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(
+      title = paste("Frequency of Top", top_n, "Domains"),
+      x = "Domains",
+      y = "Frequency"
+    ) +
+    theme_minimal()
+}
+aggregate_and_plot_top_domains(submissions_crime, "body")
 

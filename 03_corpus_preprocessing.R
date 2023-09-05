@@ -1,7 +1,6 @@
 library(tidyverse)
 library(quanteda)
 library(quanteda.textstats)
-library(lubridate)
 
 merged_crime <- read.csv2("data/merged_crime.csv", 
                         colClasses=c(NA), header = TRUE)
@@ -18,49 +17,33 @@ replace_umlaut <- function(text) {
   return(text)
 }
 
-merged_crime <- merged_crime %>%
-  mutate(body = replace_umlaut(body),
-         user = replace_umlaut(user),
-         title = replace_umlaut(title)
-  )
+merged_crime <- merged_crime  |> 
+  mutate(across(c(body, user, title), replace_umlaut))
 
-merged_ref <- merged_ref %>%
-  mutate(body = replace_umlaut(body),
-         user = replace_umlaut(user),
-         title = replace_umlaut(title)
-  )
+merged_ref <- merged_ref |> 
+  mutate(across(c(body, user, title), replace_umlaut))
 
-corpus_crime <- corpus(merged_crime, text_field = "body")
-corpus_crime <- corpus_group(corpus_crime, groups = id)
-tokens_crime <- tokens(corpus_crime,
-                       remove_punct = TRUE,
-                       remove_symbols = TRUE,
-                       remove_numbers = TRUE,
-                       remove_url = TRUE,
-                       remove_separators = TRUE)
-tokens_crime <- tokens_remove(tokens_crime, pattern = stopwords("de"))
-dfm_crime <- dfm(tokens_crime)
-cooccurence <- fcm(dfm_crime)
-topfeat <- topfeatures(cooccurence)
-print(topfeat)
+process_text_data <- function(data_frame, group_field = "id") {
+  corpus_data <- corpus(data_frame, text_field = "body")
+  
+  tokens_data <- tokens(corpus_data,
+                        remove_punct = TRUE,
+                        remove_symbols = TRUE,
+                        remove_numbers = TRUE,
+                        remove_url = TRUE,
+                        remove_separators = TRUE)
+  
+  tokens_data <- tokens_remove(tokens_data, pattern = stopwords("de"))
+  custom_stopwords <- c("gt", "r", "#x200b", "jp", "i")
+  tokens_data <- tokens_remove(tokens_data, pattern = custom_stopwords)
+  tokens_data <- tokens_group(tokens_data, groups = data_frame[[group_field]])
+  
+  dfm_data <- dfm(tokens_data)
+  
+  return(list(corpus = corpus_data, tokens = tokens_data, dfm = dfm_data))
+}
 
+corpus_crime_processed <- process_text_data(merged_crime)
 
-df_combined <- rbind(merged_crime, merged_ref)
-corpus_combined <- corpus(df_combined, text_field = "body")
-tokens_combined <- tokens(corpus_combined,
-                          remove_punct = TRUE,
-                          remove_symbols = TRUE,
-                          remove_numbers = TRUE,
-                          remove_url = TRUE,
-                          remove_separators = TRUE)
-
-tokens_combined <- tokens_remove(tokens_combined, pattern = stopwords("de"))
-
-tokens_combined <- tokens_group(tokens_combined, groups = flair)
-
-dfm_combined <- dfm(tokens_combined)
-dfm_crime <- dfm(corpus_crime)
-
-
-
-
+corpus_combined <- rbind(merged_crime, merged_ref)
+corpus_combined_processed <- process_text_data(corpus_combined, group_field = "flair")
