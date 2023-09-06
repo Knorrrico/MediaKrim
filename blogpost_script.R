@@ -202,6 +202,34 @@ submissions_crime |>
   filter(id %in% top_3) |> 
   select(title)
 
+#Heatmap of comments most popular post
+specific_comments <- filter(merged_crime, id == 'us8wpy')
+
+# Extract weekday and hour from the timestamp
+specific_comments$weekday <- weekdays(as.Date(specific_comments$date))
+specific_comments$hour <- hour(specific_comments$date)
+specific_comments$minute <- minute(specific_comments$date)
+
+# Create a finer time scale by combining hour and minute
+specific_comments$time = sprintf("%02d:%02d", specific_comments$hour, specific_comments$minute)
+
+agg_comments <- specific_comments %>%
+  group_by(weekday, time) %>%
+  summarise(count = n())
+
+ggplot(agg_comments, aes(x = time, y = weekday, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(
+    title = "Timing of Comments for a Specific Submission",
+    x = "Hour:Minute",
+    y = "Day of the Week",
+    fill = "Number of Comments"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
 ---
   
 # Textanalyse mit Quanteda
@@ -233,7 +261,7 @@ tokens_crime <- tokens(corpus_crime,
                        remove_separators = TRUE)
 
 tokens_crime <- tokens_remove(tokens_crime, pattern = stopwords("de"))
-custom_stopwords <- c("gt", "r", "#x200b", "jp", "i")
+custom_stopwords <- c("gt", "r", "#x200b", "jp", "i", "dass")
 tokens_crime <- tokens_remove(tokens_crime, pattern = custom_stopwords)
 tokens_crime <- tokens_group(tokens_crime, groups = id)
 dfm_crime <- dfm(tokens_crime)
@@ -248,7 +276,7 @@ tokens_combined <- tokens(corpus_combined,
                           remove_separators = TRUE)
 
 tokens_combined <- tokens_remove(tokens_combined, pattern = stopwords("de"))
-custom_stopwords <- c("gt", "r", "#x200b", "jp", "i")
+custom_stopwords <- c("gt", "r", "#x200b", "jp", "i", "dass")
 tokens_combined <- tokens_remove(tokens_combined, pattern = custom_stopwords)
 tokens_combined <- tokens_group(tokens_combined, groups = id)
 dfm_combined <- dfm(tokens_combined)
@@ -263,7 +291,7 @@ tokens_submissions <- tokens(corpus_submissions,
                           remove_separators = TRUE)
 
 tokens_submissions <- tokens_remove(tokens_submissions, pattern = stopwords("de"))
-custom_stopwords <- c("gt", "r", "#x200b", "jp", "i")
+custom_stopwords <- c("gt", "r", "#x200b", "jp", "i", "dass")
 tokens_submissions <- tokens_remove(tokens_submissions, pattern = custom_stopwords)
 tokens_submissions <- tokens_group(tokens_submissions, groups = id)
 dfm_submissions <- dfm(tokens_submissions)

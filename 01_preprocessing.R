@@ -2,13 +2,13 @@
 library(tidyverse)
 
 #Einlesen Rohdaten
-submissions <- read.csv2("data_raw/submissions.csv", 
+submissions <- read.csv2("data_raw/submissions_hour.csv", 
                            sep = ",", colClasses=c(NA), header = FALSE)
 
 #Flair Kategorien 
 categories <- submissions |> 
   group_by(submissions$V6) |> 
-  summarise(as.vector(submissions$v6))
+  summarise(as.vector(submissions$V6))
 
 submissions_crime <- submissions |> 
   filter(V6 == "category crime")
@@ -20,15 +20,15 @@ submissions_ref <- submissions |>
 list <- submissions_crime$V7
 list_ref <- submissions_ref$V7
 
-lapply(list, write, "list.txt", append=TRUE)
-lapply(list_ref, write, "list_ref.txt", append=TRUE)
+# lapply(list, write, "list.txt", append=TRUE)
+# lapply(list_ref, write, "list_ref.txt", append=TRUE)
 
 # -> Einsetzen der Listen in Python Script
 
 #Laden der zugehörigen Kommentare
-comments_crime <- read.csv2("data_raw/comments_crime.csv", 
+comments_crime <- read.csv2("data_raw/comments_hour.csv", 
                             sep = ",", colClasses=c(NA), header = FALSE)
-comments_ref <- read.csv2("data_raw/comments_ref.csv", 
+comments_ref <- read.csv2("data_raw/comments_hour_ref.csv", 
                           sep = ",", colClasses=c(NA), header = FALSE)
 
 
@@ -102,6 +102,8 @@ comments_ref <- remove_t3(comments_ref)
 #Nur selftext
 selftext_crime <- submissions_crime |> 
   filter(!str_detect(body, "^http"))
+
+#Date column from character to date
 
 #Beide Dataframes mergen
 merge_and_rename <- function(submissions_df, comments_df) {
