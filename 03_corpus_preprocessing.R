@@ -8,20 +8,20 @@ merged_ref <- read.csv2("data/merged_ref.csv",
                         colClasses=c(NA), header = TRUE)
 
 #Text Preprocessing
-replacements <- c("ä" = "ae", "ö" = "oe", "ü" = "ue", "ß" = "ss")
-
-replace_umlaut <- function(text) {
-  for (char in names(replacements)) {
-    text <- stringi::stri_replace_all_fixed(text, char, replacements[char], case_insensitive = TRUE)
-  }
-  return(text)
-}
-
-merged_crime <- merged_crime  |> 
-  mutate(across(c(body, user, title), replace_umlaut))
-
-merged_ref <- merged_ref |> 
-  mutate(across(c(body, user, title), replace_umlaut))
+# replacements <- c("ä" = "ae", "ö" = "oe", "ü" = "ue", "ß" = "ss")
+# 
+# replace_umlaut <- function(text) {
+#   for (char in names(replacements)) {
+#     text <- stringi::stri_replace_all_fixed(text, char, replacements[char], case_insensitive = TRUE)
+#   }
+#   return(text)
+# }
+# 
+# merged_crime <- merged_crime  |> 
+#   mutate(across(c(body, user, title), replace_umlaut))
+# 
+# merged_ref <- merged_ref |> 
+#   mutate(across(c(body, user, title), replace_umlaut))
 
 process_text_data <- function(data_frame, group_field = "id") {
   corpus_data <- corpus(data_frame, text_field = "body")

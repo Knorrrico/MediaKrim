@@ -62,9 +62,6 @@ submissions_portion <- remove_first_row(submissions_portion)
 comments_total <- remove_first_row(comments_total)
 submissions_total <- remove_first_row(submissions_total)
 
-comments_portion$user <- gsub("^u/", "", comments_portion$user)
-submissions_portion$user <- gsub("^u/", "", submissions_portion$user)
-
 # Plotting User Activity
 # Plot Submissions by user over whole data frame
 
@@ -148,6 +145,24 @@ plot_comments_over_time(merged_crime)
 comments_over_time <- plot_comments_over_time(merged_crime)
 
 #Heatmap of submissions
+# Create year and week variable
+submissions_crime$year <- year(submissions_crime$date)
+submissions_crime$week <- week(submissions_crime$date)
+
+# Aggregate data for the heatmap
+agg_data <- submissions_crime %>%
+  group_by(year, week) %>%
+  summarise(count = n())
+
+# Generate heatmap
+ggplot(agg_data, aes(x = week, y = factor(year), fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Heatmap of Submissions Over Time",
+       x = "Week of the Year",
+       y = "Year",
+       fill = "Number of Submissions") +
+  theme_minimal()
 
 # Wochen mit stärksten Ausprägungen
 comments_per_week <- comments_over_time$comments_per_week|> 
@@ -212,4 +227,3 @@ aggregate_and_plot_top_domains <- function(df, column_name, top_n = 20) {
     theme_minimal()
 }
 aggregate_and_plot_top_domains(submissions_crime, "body")
-
