@@ -90,10 +90,32 @@ print(tfidf_crime)
 #Topic Modeling
 library(topicmodels)
 library(seededlda)
+library(tidytext)
+library(reshape2)
 
-topics <- convert(corpus_crime_documents$dfm, to = "topicmodels" )
+dfm_topics <- dfm(corpus_crime_documents$tokens) %>% 
+  dfm_trim(min_termfreq = 0.8, termfreq_type = "quantile",
+           max_docfreq = 0.1, docfreq_type = "prop")
+
+topics <- convert(dfm_topics, to = "topicmodels" )
 lda_fit <- LDA(topics, k = 5)
-terms(lda_fit, 10)
+crime_topics <- tidy(lda_fit, matrix = "beta")
+
+crime_topics
+
+crime_topic_top_terms <- crime_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+crime_topic_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()
+
 
 #Sentiment Analysis of Topics
 library(quanteda.sentiment)
