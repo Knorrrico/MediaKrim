@@ -104,6 +104,16 @@ selftext_crime <- submissions_crime |>
   filter(!str_detect(body, "^http"))
 
 #Date column from character to date
+convert_date_column <- function(df) {
+  df$date <- as.POSIXct(df$date, format = "%Y-%m-%d %H:%M:%S")
+  return(df)
+}
+
+submissions_crime <- convert_date_column(submissions_crime)
+submissions_ref <- convert_date_column(submissions_ref)
+comments_crime <- convert_date_column(comments_crime)
+comments_ref <- convert_date_column(comments_ref)
+
 
 #Beide Dataframes mergen
 merge_and_rename <- function(submissions_df, comments_df) {
