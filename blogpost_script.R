@@ -5,6 +5,10 @@ library(tidyverse)
 submissions <- read.csv2("data_blog/submissions_selftext.csv", 
                          sep = ",", colClasses=c(NA), header = FALSE)
 
+#Nur selftext
+selftext<- submissions |> 
+  filter(!str_detect(body, "^http"))
+
 #Flair Kategorien 
 categories <- submissions |> 
   group_by(submissions$V6) |> 
