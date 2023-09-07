@@ -57,6 +57,6 @@ process_text_data <- function(data_frame, group_field = NULL, remove_stopwords =
 
 
 corpus_crime_documents <- process_text_data(merged_crime, group_field = "id")
-corpus_crime_full <- process_text_data(merged_crime, remove_stopwords = TRUE)
+corpus_crime_full <- process_text_data(merged_crime, remove_stopwords = FALSE)
 corpus_combined <- rbind(merged_crime, merged_ref)
 corpus_combined_category <- process_text_data(corpus_combined, group_field = "flair")
