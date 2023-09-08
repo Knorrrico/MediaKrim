@@ -146,15 +146,15 @@ plot_sentiment_by_week <- function(corpus, terms_to_filter) {
   sentiment_scores$doc_id <- as.numeric(sentiment_scores$doc_id)
   
   sentiment_term <- left_join(merged_crime, sentiment_scores, by = c("comment_id" = "doc_id"))
-  sentiment_term <- sentiment_term %>% 
+  sentiment_term <- sentiment_term |> 
     filter(sentiment != 0.000000)
   
   sentiment_term$date <- as.Date(sentiment_term$date)
   sentiment_term$week <- floor_date(sentiment_term$date, "week")
   
   # Aggregate by week
-  aggregated_data <- sentiment_term %>%
-    group_by(week) %>%
+  aggregated_data <- sentiment_term |> 
+    group_by(week) |> 
     summarise(avg_sentiment = mean(sentiment, na.rm = TRUE))
   
   # Plot the timeline
