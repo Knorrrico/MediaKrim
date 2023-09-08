@@ -2,7 +2,7 @@
 library(tidyverse)
 
 #Einlesen Rohdaten
-submissions <- read.csv2("data_raw/submissions_hour.csv", 
+submissions <- read.csv2("data_raw/submissions_2022.csv", 
                          sep = ",", colClasses=c(NA), header = FALSE)
 
 #Flair Kategorien 
@@ -26,9 +26,9 @@ list_ref <- submissions_ref$V7
 # -> Einsetzen der Listen in Python Script
 
 #Laden der zugehörigen Kommentare
-comments_crime <- read.csv2("data_raw/comments_hour.csv", 
+comments_crime <- read.csv2("data_raw/comments_2022.csv", 
                             sep = ",", colClasses=c(NA), header = FALSE)
-comments_ref <- read.csv2("data_raw/comments_hour_ref.csv", 
+comments_ref <- read.csv2("data_raw/comments_ref_2022.csv", 
                           sep = ",", colClasses=c(NA), header = FALSE)
 
 
@@ -324,22 +324,6 @@ library(quanteda)
 library(quanteda.textstats)
 library(lemmar) #lemmar wurde von github geladen, da es einen Lemmatisierungs-Datensatz in deutscher Sprache enthält remotes::install_github("trinker/lemmar")
 
-#Text Preprocessing
-# replacements <- c("ä" = "ae", "ö" = "oe", "ü" = "ue", "ß" = "ss")
-# 
-# replace_umlaut <- function(text) {
-#   for (char in names(replacements)) {
-#     text <- stringi::stri_replace_all_fixed(text, char, replacements[char], case_insensitive = TRUE)
-#   }
-#   return(text)
-# }
-# 
-# merged_crime <- merged_crime  |> 
-#   mutate(across(c(body, user, title), replace_umlaut))
-# 
-# merged_ref <- merged_ref |> 
-#   mutate(across(c(body, user, title), replace_umlaut))
-
 process_text_data <- function(data_frame, group_field = NULL, remove_stopwords = TRUE, do_lemmatization = FALSE) {
   
   corpus_data <- corpus(data_frame, text_field = "body")
@@ -451,63 +435,3 @@ corpus_crime_lemma <- process_text_data(merged_crime, remove_stopwords = TRUE, d
 mwe <- textstat_collocations(corpus_crime_lemma, size = 2, min_count = 50)
 mwe_crime <- tokens_compound(corpus_crime_lemma, pattern = mwe)
 print(mwe_crime)
-
-#FC-Matrix
-dfm_crime_trimmed <- dfm_trim(corpus_crime_documents$dfm, min_termfreq = 100)
-fcm_crime <- fcm(dfm_crime_trimmed)
-topfeatures(fcm_crime)
-
-feat <- names(topfeatures(fcm_crime, 50))
-fcm_crime_selected <-  fcm_select(fcm_crime, pattern = feat, selection = "keep")
-
-textplot_network(fcm_crime_selected, min_freq = 0.8, vertex_size = 3)
-
-#tf-idf
-tfidf_crime <- dfm_tfidf(corpus_crime_documents$dfm)
-print(tfidf_crime)
-
-#Topic Modeling
-library(topicmodels)
-library(tidytext)
-library(reshape2)
-library(seededlda)
-
-dfm_topics <- dfm(corpus_crime_documents$tokens) %>% 
-  dfm_trim(min_termfreq = 0.8, termfreq_type = "quantile",
-           max_docfreq = 0.1, docfreq_type = "prop")
-
-# topics <- convert(dfm_topics, to = "topicmodels" )
-# lda_fit <- LDA(topics, k = 5)
-# crime_topics <- tidy(lda_fit, matrix = "beta")
-# 
-# crime_topics
-# 
-# crime_topic_top_terms <- crime_topics %>%
-#   group_by(topic) %>%
-#   slice_max(beta, n = 10) %>% 
-#   ungroup() %>%
-#   arrange(topic, -beta)
-# 
-# crime_topic_top_terms %>%
-#   mutate(term = reorder_within(term, beta, topic)) %>%
-#   ggplot(aes(beta, term, fill = factor(topic))) +
-#   geom_col(show.legend = FALSE) +
-#   facet_wrap(~ topic, scales = "free") +
-#   scale_y_reordered()
-
-topics_lda <- textmodel_lda(dfm_topics, k = 10)
-topics_document <- topics(topics_lda)
-lda_topics_df <- data.frame(id = names(topics_document), topic = topics_document)
-merged_data <- left_join(submissions_crime, lda_topics_df, by = "id")
-
-#Sentiment Analysis of Topics
-library(quanteda.sentiment)
-
-corpus_crime_documents$tokens |>
-  textstat_polarity(dictionary = data_dictionary_Rauh)
-
-#Sentiment over Time
-
-#Sentiment / Topic relation
-
-#Sentiment auf Comment Ebene Verlauf
