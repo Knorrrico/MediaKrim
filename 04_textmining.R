@@ -89,37 +89,46 @@ print(tfidf_crime)
 
 #Topic Modeling
 library(topicmodels)
-library(seededlda)
 library(tidytext)
 library(reshape2)
+library(seededlda)
 
 dfm_topics <- dfm(corpus_crime_documents$tokens) %>% 
   dfm_trim(min_termfreq = 0.8, termfreq_type = "quantile",
            max_docfreq = 0.1, docfreq_type = "prop")
 
-topics <- convert(dfm_topics, to = "topicmodels" )
-lda_fit <- LDA(topics, k = 5)
-crime_topics <- tidy(lda_fit, matrix = "beta")
+# topics <- convert(dfm_topics, to = "topicmodels" )
+# lda_fit <- LDA(topics, k = 5)
+# crime_topics <- tidy(lda_fit, matrix = "beta")
+# 
+# crime_topics
+# 
+# crime_topic_top_terms <- crime_topics %>%
+#   group_by(topic) %>%
+#   slice_max(beta, n = 10) %>% 
+#   ungroup() %>%
+#   arrange(topic, -beta)
+# 
+# crime_topic_top_terms %>%
+#   mutate(term = reorder_within(term, beta, topic)) %>%
+#   ggplot(aes(beta, term, fill = factor(topic))) +
+#   geom_col(show.legend = FALSE) +
+#   facet_wrap(~ topic, scales = "free") +
+#   scale_y_reordered()
 
-crime_topics
-
-crime_topic_top_terms <- crime_topics %>%
-  group_by(topic) %>%
-  slice_max(beta, n = 10) %>% 
-  ungroup() %>%
-  arrange(topic, -beta)
-
-crime_topic_top_terms %>%
-  mutate(term = reorder_within(term, beta, topic)) %>%
-  ggplot(aes(beta, term, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered()
-
+topics_lda <- textmodel_lda(dfm_topics, k = 10)
+topics_document <- topics(topics_lda)
+lda_topics_df <- data.frame(id = names(topics_document), topic = topics_document)
+merged_data <- left_join(submissions_crime, lda_topics_df, by = "id")
 
 #Sentiment Analysis of Topics
 library(quanteda.sentiment)
 
+corpus_crime_documents$tokens |>
+  textstat_polarity(dictionary = data_dictionary_Rauh)
+
 #Sentiment over Time
 
-#Sentiment in Submissions / Comments
+#Sentiment / Topic relation
+
+#Sentiment auf Comment Ebene Verlauf
