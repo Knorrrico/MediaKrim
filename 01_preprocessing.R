@@ -7,8 +7,7 @@ submissions <- read.csv2("data_raw/submissions.csv",
 
 #Flair Kategorien 
 categories <- submissions |> 
-  group_by(submissions$V6) |> 
-  summarise(as.vector(submissions$V6))
+  distinct(V6)
 
 submissions_crime <- submissions |> 
   filter(V6 == "category crime")

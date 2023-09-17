@@ -1,6 +1,5 @@
 #descriptive analysis / exploration
 library(tidyverse)
-library(lubridate)
 
 comments_crime <- read.csv2("data/comments_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 comments_ref <- read.csv2("data/comments_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
@@ -33,7 +32,7 @@ user_sub_df <- read_users("data_raw/submissions_user.txt")
 user_com_df <- read_users("data_raw/comments_user.txt")
 
 # User in Crime Content
-unique_users_crime <- merged_crime |>  
+merged_crime |>  
   summarise(n_unique_users = n_distinct(user))
 
 #Posthäufigkeit von Nutzern zählen
@@ -191,8 +190,7 @@ ggplot(agg_data, aes(x = week, y = factor(year), fill = count)) +
   theme_minimal()
 
 # Wochen mit stärksten Ausprägungen
-comments_per_week <- comments_over_time$comments_per_week|> 
-  arrange(desc(id))
+comments_per_week <- comments_over_time$comments_per_week
 
 start_date <- comments_per_week$week[1]
 end_date <- start_date + weeks(1)
@@ -210,6 +208,35 @@ top_3 <- as.list(head(summary_week$id, 3))
 submissions_crime |> 
   filter(id %in% top_3) |> 
   select(title)
+
+#Heatmap Kommentarbeiträg
+comments_by_id <- filter(merged_crime, id == '')
+
+#Wochentag, Stunde und Minute
+comments_by_id$weekday <- weekdays(as.Date(comments_by_id$date))
+comments_by_id$hour <-  hour(comments_by_id$date)
+comments_by_id$minute <-  minute(comments_by_id$date)
+
+#Stunden und Minuten zusammenfassen
+comments_by_id$time = sprintf("%02d:%02d", specific_comments$hour, specific_comments$minute)
+
+agg_comments <- comments_by_id |> 
+  group_by(weekday, time) |> 
+  summarise(count = n())
+
+agg_comments_filtered <- agg_comments_filtered |> 
+  filter(as.POSIXct(paste("2023-01-01", time), format="%Y-%m-%d %H:%M") >= 
+           as.POSIXct("2023-01-01 11:30", format="%Y-%m-%d %H:%M"))
+
+ggplot(agg_comments_filtered, aes(x = time, y = weekday, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Zeitreihe Kommentare",
+       x = "Zeit",
+       y = "Wochentag",
+       fill = "Anzahl") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 # Aggregierte Nachrichtenseiten
 domain_from_body <- function(df) {
