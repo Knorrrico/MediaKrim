@@ -1,11 +1,10 @@
 library(tidyverse)
 library(quanteda)
-library(tidytext)
-
-#Term Frequency
 library(quanteda.textstats)
 library(quanteda.textplots)
+library(seededlda)
 
+#Term Frequency
 term_freq <- as.data.frame(textstat_frequency(corpus_crime_documents$dfm))
 term_freq <- term_freq[order(-term_freq$frequency), ]
 head(term_freq)
@@ -97,9 +96,6 @@ result <- related_keyterms(corpus_crime_documents$tokens, related_to_keyterms)
 head(result, 50)
 
 #Topic Modeling
-library(tidytext)
-library(reshape2)
-library(seededlda)
 submissions_crime <- read.csv2("data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
 dfm_topics <- dfm(corpus_crime_documents$tokens) |>  
