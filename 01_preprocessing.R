@@ -2,13 +2,12 @@
 library(tidyverse)
 
 #Einlesen Rohdaten
-submissions <- read.csv2("data_raw/submissions_hour.csv", 
-                           sep = ",", colClasses=c(NA), header = FALSE)
+submissions <- read.csv2("data_raw/submissions.csv", 
+                         sep = ",", colClasses=c(NA), header = FALSE)
 
 #Flair Kategorien 
 categories <- submissions |> 
-  group_by(submissions$V6) |> 
-  summarise(as.vector(submissions$V6))
+  distinct(V6)
 
 submissions_crime <- submissions |> 
   filter(V6 == "category crime")
@@ -26,11 +25,10 @@ list_ref <- submissions_ref$V7
 # -> Einsetzen der Listen in Python Script
 
 #Laden der zugehörigen Kommentare
-comments_crime <- read.csv2("data_raw/comments_hour.csv", 
+comments_crime <- read.csv2("data_raw/comments.csv", 
                             sep = ",", colClasses=c(NA), header = FALSE)
-comments_ref <- read.csv2("data_raw/comments_hour_ref.csv", 
+comments_ref <- read.csv2("data_raw/comments_ref.csv", 
                           sep = ",", colClasses=c(NA), header = FALSE)
-
 
 #Entfernen von NA, Umbenennen der Variablen
 
@@ -66,7 +64,9 @@ rename_comments <- function(df) {
 #Gelöschte und Entfernte Inhalte filtern
 clean_and_tolower <- function(df) {
   df <- df |> 
-    filter(!(body %in% c("[deleted]", "[removed]", ""))) |> 
+    filter(!grepl("^\\[", body), 
+          !(body %in% c("[deleted]", "[removed]", "")),
+          !grepl("^\\/u\\/", body)) |> 
     mutate(body = tolower(body)
     )
   
@@ -114,7 +114,6 @@ submissions_ref <- convert_date_column(submissions_ref)
 comments_crime <- convert_date_column(comments_crime)
 comments_ref <- convert_date_column(comments_ref)
 
-
 #Beide Dataframes mergen
 merge_and_rename <- function(submissions_df, comments_df) {
   # Select specific columns from the submissions data frame
@@ -133,6 +132,15 @@ merge_and_rename <- function(submissions_df, comments_df) {
 
 merged_crime <- merge_and_rename(submissions_crime, comments_crime)
 merged_ref <- merge_and_rename(submissions_ref, comments_ref)
+
+add_unique_id <- function(df, id_column_name = "unique_id") {
+  df <- df %>%
+    mutate(!!id_column_name := row_number())
+  return(df)
+}
+
+merged_crime <- add_unique_id(merged_crime, "comment_id")
+merged_ref <- add_unique_id(merged_ref, "comment_id")
 
 #Speicher gesäuberten Datensatz
 write.csv2(submissions_crime, "data/submissions_crime.csv", row.names = FALSE)
