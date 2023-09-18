@@ -3,7 +3,7 @@ library(tidyverse)
 
 #Einlesen Rohdaten
 submissions <- read.csv2("data_raw/submissions.csv", 
-                           sep = ",", colClasses=c(NA), header = FALSE)
+                         sep = ",", colClasses=c(NA), header = FALSE)
 
 #Flair Kategorien 
 categories <- submissions |> 
@@ -64,7 +64,9 @@ rename_comments <- function(df) {
 #Gelöschte und Entfernte Inhalte filtern
 clean_and_tolower <- function(df) {
   df <- df |> 
-    filter(!grepl("^\\[", body), !(body %in% c("[deleted]", "[removed]", ""))) |> 
+    filter(!grepl("^\\[", body), 
+          !(body %in% c("[deleted]", "[removed]", "")),
+          !grepl("^\\/u\\/", body)) |> 
     mutate(body = tolower(body)
     )
   
