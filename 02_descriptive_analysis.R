@@ -20,6 +20,8 @@ range(merged_crime$date)
 #Count selftext
 nrow(selftext_crime)
 
+nrow(submissions_crime)/nrow(submissions)
+
 #All User in Data
 read_users <- function(file_path) {
   con <- file(file_path, "r")

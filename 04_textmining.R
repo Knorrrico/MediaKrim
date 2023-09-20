@@ -3,6 +3,8 @@ library(quanteda)
 library(quanteda.textstats)
 library(quanteda.textplots)
 library(seededlda)
+library(ggrepel)
+library(GGally)
 
 #Term Frequency
 term_freq <- as.data.frame(textstat_frequency(corpus_crime_documents$dfm))
@@ -96,42 +98,104 @@ result <- related_keyterms(corpus_crime_documents$tokens, related_to_keyterms)
 head(result, 50)
 
 #Topic Modeling
-submissions_crime <- read.csv2("data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
-dfm_topics <- dfm(corpus_crime_documents$tokens) |>  
+dfm_topics <- corpus_crime_documents$dfm |>  
   dfm_trim(min_termfreq = 0.8, termfreq_type = "quantile",
            max_docfreq = 0.1, docfreq_type = "prop")
 
 
 topics_lda <- textmodel_lda(dfm_topics, k = 10)
 topics_document <- topics(topics_lda)
-terms_by_topic <- terms(topics_lda)
+terms_by_topic <- terms(topics_lda, n = 20)
 lda_topics_df <- data.frame(id = names(topics_document), topic = topics_document)
 merged_topic <- left_join(submissions_crime, lda_topics_df, by = "id")
 
+#PieChart
+
+# Calculate frequencies
+category_freq <- lda_topics_df %>%
+  drop_na(topic) %>% 
+  group_by(topic) |>
+  summarise(value = n()) %>%
+  arrange(topic) %>%
+  mutate(freq = value / sum(value) * 100)
+
+# Compute label positions
+df2 <- category_freq %>%
+  mutate(csum = rev(cumsum(rev(freq))), 
+         pos = freq / 2 + lead(csum, 1),
+         pos = if_else(is.na(pos), freq / 2, pos))
+
+# Create the pie chart
+ggplot(category_freq, aes(x = "", y = freq, fill = fct_inorder(topic))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Pastel1") +
+  geom_label_repel(data = df2,
+                   aes(y = pos, label = paste0(round(freq, 1), "%")),
+                   size = 4.5, nudge_x = 1, show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Category")) +
+  theme_void()
+
 #Sentiment Analysis of Topics
-library(quanteda.sentiment)
 
-sentiment <- corpus_crime_documents$tokens |>
-  textstat_polarity(dictionary = data_dictionary_Rauh)
+analyze_sentiment_by_topic <- function(corpus_data, topic_data, dictionary_data, id_counts_data) {
+  
+  # Calculate sentiment scores for the tokenized documents
+  sentiment <- corpus_data$tokens %>%
+    textstat_polarity(dictionary = dictionary_data)
+  
+  # Merge the topic data with the newly computed sentiment scores
+  merged_topic_sentiment <- left_join(topic_data, sentiment, by = c("id" = "doc_id"))
+  
+  # Remove rows with NA in either "topic" or "sentiment" columns
+  merged_clean <- merged_topic_sentiment[complete.cases(merged_topic_sentiment[, c("topic", "sentiment")]), ]
+  
+  # Group the clean data by 'topic' and calculate the mean sentiment score for each topic
+  grouped_data <- merged_clean %>%
+    group_by(topic) %>%
+    summarise(average_sentiment = mean(sentiment, na.rm = TRUE))
+  
+  # Merge with another dataset called id_counts, based on the 'id' column
+  merged_clean <- merged_clean %>%
+    left_join(id_counts_data, by = "id")
+  
+  return(list(grouped_data, merged_clean))
+}
 
-merged_topic_sentiment <- left_join(merged_topic, sentiment, by = c("id" = "doc_id"))
+sentiment_rauh <- analyze_sentiment_by_topic(corpus_crime_documents, merged_topic, data_dictionary_Rauh, id_counts)
+df_rauh <- sentiment_rauh[[2]]
 
-merged_clean <- merged_topic_sentiment[complete.cases(merged_topic_sentiment[, c("topic", "sentiment")]), ]
+sentiment_ws <- analyze_sentiment_by_topic(corpus_crime_documents, merged_topic, data_dictionary_sentiws, id_counts)
+df_ws <- sentiment_ws[[2]]
 
-merged_clean |> 
-  group_by(topic) |> 
-  summarise(average_sentiment = mean(sentiment, na.rm = TRUE))
+df_ws <- df_ws |> 
+  select(id, sentiment)
 
-merged_clean <-  merged_clean |> 
-  left_join(id_counts, by = "id")
+sentiments_of_topics  <- left_join(df_rauh, df_ws, by = "id")
 
-#Sentiment / Topic / Interaction relation
-linear_model <- lm(sentiment ~ topic, data = merged_clean)
-linear_model <- lm(count ~ sentiment, data = merged_clean)
-linear_model <- lm(count ~ topic, data = merged_clean)
-linear_model <- lm(score ~ topic, data = merged_clean)
-summary(linear_model)
+sentiments_of_topics <-  sentiments_of_topics |> 
+  mutate(
+    sentiment_diff = abs(sentiment.x - sentiment.y)
+  )
+
+sentiments_of_topics <- sentiments_of_topics |> 
+  rename(sentiment_rauh = sentiment.x,
+         sentiment_ws = sentiment.y)
+
+ggpairs(sentiments_of_topics[, c("sentiment_rauh", "sentiment_ws")])
+
+
+sentiments_of_topics <- sentiments_of_topics %>%
+  mutate(
+    mean_sentiment = (sentiment_rauh + sentiment_ws) / 2
+  )
+
+average_sentiment_of_topic <- sentiments_of_topics %>%
+  group_by(topic) %>%
+  summarise(
+    average_mean_sentiment = mean(mean_sentiment, na.rm = TRUE)
+  )
 
 #Sentiment over Time
 plot_sentiment_by_week <- function(corpus, terms_to_filter) {
@@ -199,3 +263,10 @@ fit <- glm(is_negative ~ first_is_negative, data = sentiment_comment, family = b
 
 # Summary of the model
 summary(fit)
+
+#Sentiment / Topic / Interaction relation
+linear_model <- lm(sentiment ~ topic, data = merged_clean)
+linear_model <- lm(count ~ sentiment, data = merged_clean)
+linear_model <- lm(count ~ topic, data = merged_clean)
+linear_model <- lm(score ~ topic, data = merged_clean)
+summary(linear_model)
