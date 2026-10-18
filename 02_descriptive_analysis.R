@@ -10,6 +10,11 @@ submissions_ref <- read.csv2("data/submissions_ref.csv", colClasses=c(NA), heade
 merged_crime <- read.csv2("data/merged_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 merged_ref <- read.csv2("data/merged_ref.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
 
+# Objects that 01_preprocessing.R only kept in memory
+submissions_raw <- read.csv2("data_raw/submissions.csv", sep = ",", colClasses=c(NA), header = FALSE)
+selftext_crime <- submissions_crime |> 
+  filter(!str_detect(body, "^http"))
+
 #Häufigkeit Kommentare und Beiträge
 nrow(comments_crime)
 nrow(submissions_crime)
@@ -20,7 +25,7 @@ range(merged_crime$date)
 #Count selftext
 nrow(selftext_crime)
 
-nrow(submissions_crime)/nrow(submissions)
+nrow(submissions_crime)/nrow(submissions_raw)
 
 #All User in Data
 read_users <- function(file_path) {
@@ -194,7 +199,9 @@ ggplot(agg_data, aes(x = week, y = factor(year), fill = count)) +
 # Wochen mit stärksten Ausprägungen
 comments_per_week <- comments_over_time$comments_per_week
 
-start_date <- comments_per_week$week[1]
+start_date <- comments_per_week |> 
+  slice_max(id, n = 1, with_ties = FALSE) |> 
+  pull(week)
 end_date <- start_date + weeks(1)
 
 most_comments_week <- comments_crime |> 
@@ -211,8 +218,8 @@ submissions_crime |>
   filter(id %in% top_3) |> 
   select(title)
 
-#Heatmap Kommentarbeiträg
-comments_by_id <- filter(merged_crime, id == '')
+#Heatmap Kommentarbeiträge des meistkommentierten Beitrags dieser Woche
+comments_by_id <- filter(merged_crime, id == top_3[[1]])
 
 #Wochentag, Stunde und Minute
 comments_by_id$weekday <- weekdays(as.Date(comments_by_id$date))
@@ -220,13 +227,13 @@ comments_by_id$hour <-  hour(comments_by_id$date)
 comments_by_id$minute <-  minute(comments_by_id$date)
 
 #Stunden und Minuten zusammenfassen
-comments_by_id$time = sprintf("%02d:%02d", specific_comments$hour, specific_comments$minute)
+comments_by_id$time = sprintf("%02d:%02d", comments_by_id$hour, comments_by_id$minute)
 
 agg_comments <- comments_by_id |> 
   group_by(weekday, time) |> 
   summarise(count = n())
 
-agg_comments_filtered <- agg_comments_filtered |> 
+agg_comments_filtered <- agg_comments |> 
   filter(as.POSIXct(paste("2023-01-01", time), format="%Y-%m-%d %H:%M") >= 
            as.POSIXct("2023-01-01 11:30", format="%Y-%m-%d %H:%M"))
 
@@ -255,7 +262,8 @@ domain_from_body <- function(df) {
   return(df_filtered)
 }
 
-submissions_crime <- domain_from_body(submissions_crime)
+# separate object, so submissions_crime keeps all submissions
+submissions_links <- domain_from_body(submissions_crime)
 
 aggregate_and_plot_top_domains <- function(df, column_name, top_n = 20) {
   # Aggregate by domains
@@ -281,4 +289,4 @@ aggregate_and_plot_top_domains <- function(df, column_name, top_n = 20) {
     ) +
     theme_minimal()
 }
-aggregate_and_plot_top_domains(submissions_crime, "body")
+aggregate_and_plot_top_domains(submissions_links, "body")

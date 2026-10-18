@@ -64,7 +64,9 @@ rename_comments <- function(df) {
 #Gelöschte und Entfernte Inhalte filtern
 clean_and_tolower <- function(df) {
   df <- df |> 
-    filter(!grepl("^\\[", body), 
+    # drop placeholders like "[deleted]" or "[removed by reddit]", but keep
+    # comments that simply start with a markdown link "[text](url)"
+    filter(!grepl("^\\[(deleted|removed)", body), 
           !(body %in% c("[deleted]", "[removed]", "")),
           !grepl("^\\/u\\/", body)) |> 
     mutate(body = tolower(body)

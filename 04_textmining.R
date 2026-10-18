@@ -5,6 +5,19 @@ library(quanteda.textplots)
 library(seededlda)
 library(ggrepel)
 library(GGally)
+library(quanteda.sentiment) # data_dictionary_Rauh, data_dictionary_sentiws, textstat_polarity()
+library(sandwich)
+library(lmtest)
+
+# Corpora from 03 and the data this script needs, so it runs on its own
+source("03_corpus_preprocessing.R")
+
+submissions_crime <- read.csv2("data/submissions_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+comments_crime <- read.csv2("data/comments_crime.csv", colClasses=c(NA), header = TRUE, stringsAsFactors = FALSE)
+
+id_counts <- comments_crime |> 
+  group_by(id) |> 
+  summarise(count = n())
 
 #Term Frequency
 term_freq <- as.data.frame(textstat_frequency(corpus_crime_documents$dfm))
@@ -22,14 +35,14 @@ ggplot(head(term_freq, 20), aes(x = reorder(feature, -frequency), y = frequency)
   ) +
   theme_minimal()
 
-tokens_subset(corpus_combined_category$tokens) |> 
+corpus_combined_category$tokens |> 
   dfm() |> 
   dfm_group(groups = flair) |> 
   dfm_trim(min_termfreq = 100, verbose = FALSE) |> 
   textplot_wordcloud(comparison = TRUE)
 
 #Keyword Analysis
-keyness_crime <- textstat_keyness(corpus_combined_category$dfm, target = 1L)
+keyness_crime <- textstat_keyness(corpus_combined_category$dfm, target = "category crime")
 
 #Visualize
 ggplot(head(keyness_crime, 20), aes(x = reorder(feature, -n_target), y = n_target)) +
@@ -104,6 +117,7 @@ dfm_topics <- corpus_crime_documents$dfm |>
            max_docfreq = 0.1, docfreq_type = "prop")
 
 
+set.seed(2023)
 topics_lda <- textmodel_lda(dfm_topics, k = 10)
 topics_document <- topics(topics_lda)
 terms_by_topic <- terms(topics_lda, n = 20)
@@ -163,10 +177,11 @@ analyze_sentiment_by_topic <- function(corpus_data, topic_data, dictionary_data,
   return(list(grouped_data, merged_clean))
 }
 
-sentiment_rauh <- analyze_sentiment_by_topic(corpus_crime_documents, merged_topic, data_dictionary_Rauh, id_counts)
+# Sentiment is scored on tokens that still contain negations (see 03)
+sentiment_rauh <- analyze_sentiment_by_topic(corpus_crime_sentiment, merged_topic, data_dictionary_Rauh, id_counts)
 df_rauh <- sentiment_rauh[[2]]
 
-sentiment_ws <- analyze_sentiment_by_topic(corpus_crime_documents, merged_topic, data_dictionary_sentiws, id_counts)
+sentiment_ws <- analyze_sentiment_by_topic(corpus_crime_sentiment, merged_topic, data_dictionary_sentiws, id_counts)
 df_ws <- sentiment_ws[[2]]
 
 df_ws <- df_ws |> 
@@ -258,15 +273,25 @@ sentiment_comment <- sentiment_comment |>
   group_by(id) |>  
   mutate(first_is_negative = first(is_negative))
 
-# Run the logistic regression
-fit <- glm(is_negative ~ first_is_negative, data = sentiment_comment, family = binomial())
+# Run the logistic regression on the replies only: the first comment would
+# otherwise predict itself. Comments in the same thread are not independent,
+# so standard errors are clustered by thread.
+replies <- sentiment_comment |> 
+  filter(row_number() > 1) |> 
+  ungroup()
 
-# Summary of the model
-summary(fit)
+fit <- glm(is_negative ~ first_is_negative, data = replies, family = binomial())
 
-#Sentiment / Topic / Interaction relation
-linear_model <- lm(sentiment ~ topic, data = merged_clean)
-linear_model <- lm(count ~ sentiment, data = merged_clean)
-linear_model <- lm(count ~ topic, data = merged_clean)
-linear_model <- lm(score ~ topic, data = merged_clean)
-summary(linear_model)
+# Summary of the model with cluster-robust standard errors
+coeftest(fit, vcov = vcovCL(fit, cluster = ~ id))
+
+#Sentiment / Topic / Interaction relation (one row per submission)
+model_sentiment_topic <- lm(sentiment ~ factor(topic), data = df_rauh)
+model_count_sentiment <- lm(count ~ sentiment, data = df_rauh)
+model_count_topic     <- lm(count ~ factor(topic), data = df_rauh)
+model_score_topic     <- lm(score ~ factor(topic), data = df_rauh)
+
+summary(model_sentiment_topic)
+summary(model_count_sentiment)
+summary(model_count_topic)
+summary(model_score_topic)

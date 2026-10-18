@@ -1,7 +1,7 @@
 library(tidyverse)
 library(quanteda)
 library(quanteda.textstats)
-library(lemmar)
+library(lemmar) # remotes::install_github("trinker/lemmar")
 
 merged_crime <- read.csv2("data/merged_crime.csv", 
                           colClasses=c(NA), header = TRUE)
@@ -41,6 +41,9 @@ process_text_data <- function(data_frame, group_field = NULL, remove_stopwords =
 
 corpus_crime_documents <- process_text_data(merged_crime, group_field = "id")
 corpus_crime_full <- process_text_data(merged_crime, remove_stopwords = FALSE, group_field = "comment_id")
+
+# Sentiment needs the stopwords: they contain negations ("nicht", "kein")
+corpus_crime_sentiment <- process_text_data(merged_crime, remove_stopwords = FALSE, group_field = "id")
 
 corpus_combined <- rbind(merged_crime, merged_ref)
 corpus_combined_category <- process_text_data(corpus_combined, group_field = "flair", do_lemmatization = TRUE)
