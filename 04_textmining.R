@@ -111,44 +111,110 @@ result <- related_keyterms(corpus_crime_documents$tokens, related_to_keyterms)
 head(result, 50)
 
 #Topic Modeling
-
 dfm_topics <- corpus_crime_documents$dfm |>  
   dfm_trim(min_termfreq = 0.8, termfreq_type = "quantile",
            max_docfreq = 0.1, docfreq_type = "prop")
 
+#Step 1: unsupervised LDA with 20 topics to explore the themes in the corpus
+set.seed(2023)
+topics_lda <- textmodel_lda(dfm_topics, k = 20)
+terms_by_topic <- terms(topics_lda, n = 100)
+terms_by_topic
+
+#Step 2: seeded LDA. Ten themes from step 1 were summarised under a label
+#and their characteristic words serve as seed words
+dict <- dictionary(list(
+  sv = c("sexuell", "vergewaltigung", "sexuelle","missbrauch","vergewaltigen",
+         "belästigung","abtreibung","nötigung","selbstbestimmung","pädophile",
+         "belästigen","kinderpornografie"),
+
+  pv = c("einzelfall", "polizeigewalt", "demo","kamera","polizistin", "einsatz",
+         "bodycams", "bundespolizei","demonstrant", "versammlung","acab","fehlverhalten",
+         "waffe","schießen","erschießen","notwehr",
+         "verletzen","schusswaffe","pfefferspray",
+         "körperverletzung","polizei", "polizist"),
+
+  da = c("droge","alkohol","cannabis","legalisierung","konsum","dealer",
+         "legalisieren", "rauchen", "konsumieren", "kiffen", "heroin", "mdma",
+         "substanz", "thc", "kontrolle" ),
+
+  disc = c("rassismus","jude","rassistisch","antisemitismus","israel","flüchtling",
+           "migrationshintergrund","ausländer","diskriminierung","trans","schwul",
+           "minderheit","rassisten","homophobie"),
+
+  jur = c("ermittlung","anwalt","anklagen","beweise","ermittler","verdächtigen",
+          "prozess","justiz","urteilen","vorwurf","staatsanwalt","verurteilung",
+          "unschuldig","beweis","u-haft","rechtsstaat","unschuldsvermutung",
+          "angeklagte","stpo","jurist","hausdurchsuchung","gericht","indiz",
+          "stgb","strafrecht", "jugendstrafrecht", "urteile"),
+
+  ds = c("klauen","fahrrad","wohnung","diebstahl","eigentum","dieb","versicherung",
+         "stehlen","sprengen","bargeld"),
+
+  car = c("radfahrer","fahrzeug","fahrer","unfall","lkw","führerschein","fahrrad",
+          "autofahrer","geschwindigkeit","überholen","autobahn","fußgänger",
+          "straßenverkehr","rasen","stvo","raser","überfahren"),
+
+  pr = c("gefängnis", "urteilen", "knast", "bewährung", "todesstrafe",
+         "haft","vorsatz", "lebenslang", "strafmaß", "justiz", "taten",
+         "haftstrafe", "freiheitsstrafe", "strafrecht", "gerechtigkeit",
+         "lebenslänglich", "urteile"),
+
+  scam = c("nummer","handy","anruf","werbung","betrüger","scam","reinfallen"),
+
+  pe = c("afd","rechtsextrem","linke","partei","politische","verfassungsschutz",
+         "ideologie", "neonazi", "rechtsextreme", "antifa", "rechtsextremismus",
+         "terrorist", "faschist", "terrorismus", "mitte","rechtsradikal", "nsu",
+         "extremist", "volk","propaganda")
+))
 
 set.seed(2023)
-topics_lda <- textmodel_lda(dfm_topics, k = 10)
-topics_document <- topics(topics_lda)
-terms_by_topic <- terms(topics_lda, n = 20)
-lda_topics_df <- data.frame(id = names(topics_document), topic = topics_document)
+tmod_slda <- textmodel_seededlda(dfm_topics, dictionary = dict)
+
+topics_document <- topics(tmod_slda)
+lda_topics_df <- data.frame(id = names(topics_document), topic = as.character(topics_document))
 merged_topic <- left_join(submissions_crime, lda_topics_df, by = "id")
+
+#Labels of the seeded topics
+replacement_names <- c(
+  sv = "Sexualisierte Gewalt",
+  pv = "Polizeigewalt",
+  da = "BtMG",
+  disc = "Diskriminierung",
+  jur = "Strafverfahren",
+  ds = "Diebstahl/Raub",
+  car = "Straßenverkehr",
+  pr = "Strafvollzug",
+  scam = "Telefon-/Internetbetrug",
+  pe = "Extremismus"
+)
 
 #PieChart
 
 # Calculate frequencies
-category_freq <- lda_topics_df %>%
-  drop_na(topic) %>% 
+category_freq <- lda_topics_df |>
+  drop_na(topic) |>
   group_by(topic) |>
-  summarise(value = n()) %>%
-  arrange(topic) %>%
-  mutate(freq = value / sum(value) * 100)
+  summarise(value = n()) |>
+  arrange(topic) |>
+  mutate(freq = value / sum(value) * 100,
+         topic = recode(topic, !!!replacement_names))
 
 # Compute label positions
-df2 <- category_freq %>%
+df2 <- category_freq |>
   mutate(csum = rev(cumsum(rev(freq))), 
          pos = freq / 2 + lead(csum, 1),
          pos = if_else(is.na(pos), freq / 2, pos))
 
-# Create the pie chart
+# Create the pie chart (Set3 has 12 colours, Pastel1 only 9)
 ggplot(category_freq, aes(x = "", y = freq, fill = fct_inorder(topic))) +
   geom_col(width = 1, color = 1) +
   coord_polar(theta = "y") +
-  scale_fill_brewer(palette = "Pastel1") +
+  scale_fill_brewer(palette = "Set3") +
   geom_label_repel(data = df2,
                    aes(y = pos, label = paste0(round(freq, 1), "%")),
                    size = 4.5, nudge_x = 1, show.legend = FALSE) +
-  guides(fill = guide_legend(title = "Category")) +
+  guides(fill = guide_legend(title = "Topic")) +
   theme_void()
 
 #Sentiment Analysis of Topics
@@ -210,7 +276,8 @@ average_sentiment_of_topic <- sentiments_of_topics %>%
   group_by(topic) %>%
   summarise(
     average_mean_sentiment = mean(mean_sentiment, na.rm = TRUE)
-  )
+  ) |> 
+  mutate(topic = recode(topic, !!!replacement_names))
 
 #Sentiment over Time
 plot_sentiment_by_week <- function(corpus, terms_to_filter) {
